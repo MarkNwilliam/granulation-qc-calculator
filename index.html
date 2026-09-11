@@ -139,6 +139,50 @@
     </details>
   </div>
 
+  <div class="panel">
+    <h2>Section C &middot; Press profile and compression recommendations</h2>
+    <div class="ph">Pick the press this granulation will run on. The DLT 50/300/300 profile turns the flow character, moisture and fines into a recommended turret output, an expected weight variation, sticking and capping risk, and the corrective actions to take. The profile numbers are editable, confirm them against the machine plate.</div>
+    <table>
+      <thead><tr><th>Press profile</th><th>Max force, kN</th><th>Rated output, tabs/h</th><th>Max tablet, mm</th></tr></thead>
+      <tbody><tr>
+        <td><select id="press">
+          <option>DLT 50/300/300</option></select></td>
+        <td><input id="pf" type="number" min="1" step="1" value="50"></td>
+        <td><input id="pr" type="number" min="1" step="1000" value="300000"></td>
+        <td><input id="pd" type="number" min="1" step="1" value="30"></td>
+      </tr></tbody>
+    </table>
+    <table style="margin-top:16px">
+      <thead><tr><th>Planned press setting</th><th>Value</th><th class="right">Derived</th></tr></thead>
+      <tbody>
+        <tr><td>Planned compression force, kN</td><td><input id="bf" class="small" type="number" min="0" step="0.5" value="20"></td>
+          <td class="right">force margin <span class="outnum" id="mrg">-</span></td></tr>
+        <tr><td>Planned output, tabs/h</td><td><input id="bo" class="small" type="number" min="0" step="1000" value="240000"></td>
+          <td class="right">speed use <span class="outnum" id="spd">-</span></td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:16px">
+      <thead><tr><th>Recommendation</th><th class="right">Result</th></tr></thead>
+      <tbody>
+        <tr><td>Recommended turret output<div class="precise">rated output scaled by the flow character</div></td>
+          <td class="right"><span class="outnum" id="recTpm">-</span> <span class="precise" id="recPct"></span></td></tr>
+        <tr><td>Expected weight variation</td><td class="right"><span class="outnum" id="recWv">-</span></td></tr>
+        <tr><td>Die filling</td><td class="right" style="text-align:left"><span id="recFill">-</span></td></tr>
+        <tr><td>Sticking and picking risk</td><td style="text-align:left"><span id="stickChip"></span><div class="precise" id="stickWhy"></div></td></tr>
+        <tr><td>Capping and lamination risk</td><td style="text-align:left"><span id="capChip"></span><div class="precise" id="capWhy"></div></td></tr>
+        <tr><td>Moisture (LOD) advisory</td><td style="text-align:left"><span class="outnum" id="lodLvl">-</span>
+          <div class="precise" id="lodDef"></div>
+          <div class="precise" id="lodAct"></div></td></tr>
+      </tbody>
+    </table>
+    <details>
+      <summary>Mathematical models and standards behind the recommendations</summary>
+      <table><thead><tr><th>Model</th><th>Equation</th><th>Used for</th></tr></thead>
+      <tbody id="modelRows"></tbody></table>
+      <div class="note">Flow and compressibility are read through Carr and Hausner (USP &lt;1174&gt;). Die fill follows the Beverloo orifice flow law. Speed sets the dwell time t = (contact angle / 360) x (60 / rpm). Compact formation follows Heckel, Ryshkewitch-Duckworth and Leuenberger, which is where capping and lamination come from. Weight variation is held against the in process specification and USP &lt;905&gt;. All advisory, confirm on the first compression.</div>
+    </details>
+  </div>
+
   <div class="btnrow"><button class="btn" id="reset">Reset all fields</button></div>
 </div>
 <footer>granulation-qc-calculator &middot; all results stay in the browser</footer>
@@ -260,17 +304,97 @@ function updateVerdict(){
     v.className="verdict";v.style="";$("vTitle").textContent="";$("vText").textContent="";
   }
 }
-[$("A"),...S.map(id=>$(id)),$("lod"),$("bd"),$("td")]
-  .forEach(el=>el.addEventListener("input",()=>{computeA();computeB();}));
+const FLOW_SPEED={Excellent:1.00,Good:0.95,Fair:0.80,Passable:0.65,Poor:0.50,"Very poor":0.35,"Very, very poor":0.25};
+const WEIGHT_RSD={Excellent:"up to 1.5%",Good:"1.5 to 2.0%",Fair:"2.0 to 3.0%",Passable:"3.0 to 4.5%",Poor:"4.5 to 6.0%","Very poor":"above 6%, watch rejects","Very, very poor":"above 6%, expect rejects"};
+const MODELS=[
+  ["Carr compressibility index","C = 100 (rhoT - rhoB) / rhoT","flow and compressibility, read with USP 1174"],
+  ["Hausner ratio","H = rhoT / rhoB = 100 / (100 - C)","flow, read with USP 1174"],
+  ["Beverloo orifice flow","W = C rhoB (D - k d)^2.5","gravity die fill rate through the feed orifice"],
+  ["Dwell time","t = (contact angle / 360) x (60 / rpm)","time under compression, falls as speed rises"],
+  ["Heckel equation","ln(1 / (1 - D)) = k P + A","mean yield pressure Py = 1/k, deformation and capping tendency"],
+  ["Ryshkewitch-Duckworth","sigma = sigma0 exp(-b e)","compact tensile strength against porosity, capping risk"],
+  ["Leuenberger","sigma = sigmaMax (1 - exp(-gamma P (1 - e)))","compact strength from pressure and porosity"]
+];
+function riskLevel(s){return s>=5?"High":s>=2?"Moderate":"Low";}
+function riskChipJS(r){const c=r==="Low"?"g":r==="Moderate"?"a":"r";return '<span class="chip c-'+c+'">'+r+'</span>';}
+function stickingRiskJS(lod,fines,worse,above20,speedPct){
+  let s=0;const why=[];
+  if(lod<1.0){s++;why.push("LOD below 1%, dry dust and electrostatics");}
+  else if(lod>2.5){s++;why.push("LOD above 2.5%, moist surface for sticking");}
+  if(fines>90){s++;why.push("fines above 90%, dust on the tooling");}
+  else if(fines<50){s++;why.push("fines below 50%, uneven die fill");}
+  if(RATINGS.indexOf(worse)>=5){s++;why.push("very poor flow, weight variation on the feed");}
+  if(above20>15){s++;why.push("oversize above 20# above 15%, irregular granules");}
+  if(speedPct>=85){s++;why.push("output above 85% of press rating, short dwell");}
+  return {level:riskLevel(s),why:why};
+}
+function cappingRiskJS(lod,fines,worse,above20,forceMargin){
+  let s=0;const why=[];
+  if(above20>15){s+=2;why.push("oversize above 20# above 15%, weak compaction lattice");}
+  if(fines<50){s++;why.push("fines below 50%, poor particle bonding");}
+  if(lod<1.0){s++;why.push("overdry granulation, friable compact edge");}
+  if(RATINGS.indexOf(worse)>=5){s++;why.push("very poor compressibility, porous compact");}
+  if(forceMargin<10){s++;why.push("planned force within 10% of the press maximum");}
+  return {level:riskLevel(s),why:why};
+}
+function lodAdvisoryJS(lod){
+  if(lod<1.0)return {level:"Low moisture, granulation too dry",
+    defects:["capping and splitting of the tablet top","friability and pickup defects on takeoff"],
+    actions:["bring the moisture back up, re humidify in the FBE or add a little water with mixing","shorten the drying step next batch","re sieve and re lubricate before compression"]};
+  if(lod<=2.5)return {level:"In the drying window",defects:[],actions:["proceed to compression and keep the blend covered"]};
+  return {level:"High moisture, granulation too wet",
+    defects:["sticking and picking on the punches","binding in the die cavity","lamination, tablets splitting in half"],
+    actions:["re dry in the FBE to within the BMR limit","re sieve the dried granulation","re lubricate before compression"]};
+}
+function computeC(){
+  const ids=["recTpm","recPct","recWv","recFill","mrg","spd"];
+  if(!(sectionAComplete()&&sectionBComplete())){
+    ids.forEach(id=>$(id).textContent="-");
+    ["stickChip","stickWhy","capChip","capWhy","lodLvl","lodDef","lodAct"].forEach(id=>$(id).innerHTML="");
+    return;
+  }
+  const A=nf($("A").value), w=S.map(id=>nf($(id).value));
+  const indiv=w.map(x=>x/A*100).map(p=>rhu(p,0));
+  const above20=indiv[0], fines=rhu((w[3]+w[4]+w[5])/A*100,1);
+  const lod=nf($("lod").value),bd=nf($("bd").value),td=nf($("td").value);
+  const rc=ratingCarr(rhu((td-bd)/td*100,2)),rh=ratingHaus(rhu(td/bd,2));
+  const worse=RATINGS.indexOf(rc)>=RATINGS.indexOf(rh)?rc:rh;
+  const pr=nf($("pr").value),pf=nf($("pf").value),bf=nf($("bf").value),bo=nf($("bo").value);
+  const speedPct=bo!=null&&pr?bo/pr*100:0;
+  const forceMargin=(pf!=null&&bf!=null&&pf>0)?(pf-bf)/pf*100:0;
+  $("mrg").textContent=(pf!=null&&bf!=null&&pf>0)?fmt(forceMargin,1)+"%":"-";
+  $("spd").textContent=(bo!=null&&pr)?fmt(speedPct,1)+"%":"-";
+  const factor=FLOW_SPEED[worse], tpm=pr/60*factor;
+  $("recTpm").textContent=fmt(tpm*0.9,0)+" to "+fmt(tpm*1.1,0)+" tabs/h";
+  $("recPct").textContent="("+Math.round(factor*100)+"% of the rated output)";
+  $("recWv").textContent=WEIGHT_RSD[worse];
+  $("recFill").textContent=RATINGS.indexOf(worse)>=4?"uneven die fill likely, expect weight and thickness variation; use a force feeder and hold the lower speed":"die fill should stay uniform at the recommended speed";
+  const st=stickingRiskJS(lod,fines,worse,above20,speedPct);
+  $("stickChip").innerHTML=riskChipJS(st.level);
+  $("stickWhy").textContent=st.why.length?st.why.join("; "):"no sticking factors flagged";
+  const cp=cappingRiskJS(lod,fines,worse,above20,forceMargin);
+  $("capChip").innerHTML=riskChipJS(cp.level);
+  $("capWhy").textContent=cp.why.length?cp.why.join("; "):"no capping factors flagged";
+  const la=lodAdvisoryJS(lod);
+  $("lodLvl").textContent=la.level;
+  $("lodDef").textContent=la.defects.length?("watch for: "+la.defects.join(", ")):"";
+  $("lodAct").textContent="do: "+la.actions.join("; ");
+}
+$("modelRows").innerHTML=MODELS.map(m=>"<tr><td><b>"+m[0]+"</b></td><td>"+m[1]+"</td><td>"+m[2]+"</td></tr>").join("");
+[$("A"),...S.map(id=>$(id)),$("lod"),$("bd"),$("td"),
+ $("pf"),$("pr"),$("pd"),$("bf"),$("bo")]
+  .forEach(el=>el.addEventListener("input",()=>{computeA();computeB();computeC();}));
 $("reset").addEventListener("click",()=>{
   $("A").value="100.00";S.forEach(id=>$(id).value="");
   $("lod").value="";$("bd").value="";$("td").value="";
-  computeA();computeB();});
+  $("pf").value="50";$("pr").value="300000";$("pd").value="30";
+  $("bf").value="20";$("bo").value="240000";
+  computeA();computeB();computeC();});
 if(location.search.includes("demo")){
   $("A").value="100.00";
   [["s20",1.34],["s40",14.66],["s60",8.17],["s80",6.29],["s100",2.48],["sB",62.98]]
     .forEach(([id,v])=>$(id).value=String(v));
   $("lod").value="0.96";$("bd").value="0.52";$("td").value="0.74";
 }
-computeA();computeB();
+computeA();computeB();computeC();
 </script>

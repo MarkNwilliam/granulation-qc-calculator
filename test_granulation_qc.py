@@ -157,5 +157,102 @@ class Verdict(unittest.TestCase):
         self.assertEqual(v["rating"], "Passable")
 
 
+class Risk(unittest.TestCase):
+    def test_worked_example_sticking_low(self):
+        # QK260454; LOD 0.96 is dry so one point, everything else quiet.
+        r = g.sticking_risk(0.96, 71.8, "Poor", 1, 80.0)
+        self.assertEqual(r["level"], "Low")
+        self.assertEqual(r["score"], 1)
+        self.assertTrue(any("LOD below 1%" in x for x in r["reasons"]))
+
+    def test_worked_example_capping_low(self):
+        r = g.capping_risk(0.96, 71.8, "Poor", 1, 60.0)
+        self.assertEqual(r["level"], "Low")
+
+    def test_sticking_high_when_all_factors_pile(self):
+        r = g.sticking_risk(0.5, 95.0, "Very poor", 16, 90.0)
+        self.assertEqual(r["level"], "High")
+
+    def test_sticking_moderate_boundary(self):
+        r = g.sticking_risk(0.96, 71.8, "Poor", 1, 90.0)
+        self.assertEqual(r["level"], "Moderate")
+
+    def test_sticking_wet_high_lod(self):
+        r = g.sticking_risk(2.6, 71.8, "Good", 1, 50.0)
+        self.assertEqual(r["score"], 1)
+        self.assertTrue(any("LOD above 2.5%" in x for x in r["reasons"]))
+
+    def test_capping_high_when_oversized(self):
+        r = g.capping_risk(0.96, 40.0, "Very poor", 16, 5.0)
+        self.assertEqual(r["level"], "High")
+
+    def test_capping_oversize_is_double_point(self):
+        r = g.capping_risk(1.5, 60.0, "Good", 16, 50.0)
+        self.assertEqual(r["score"], 2)
+
+    def test_capping_force_margin_trip(self):
+        r = g.capping_risk(1.5, 60.0, "Good", 1, 8.0)
+        self.assertEqual(r["level"], "Low")
+        self.assertEqual(r["score"], 1)
+
+    def test_risk_levels(self):
+        self.assertEqual(g._risk_level(0), "Low")
+        self.assertEqual(g._risk_level(2), "Moderate")
+        self.assertEqual(g._risk_level(5), "High")
+
+
+class Recommendations(unittest.TestCase):
+    def test_press_profile_dlt(self):
+        p = g.PRESSES["DLT 50/300/300"]
+        self.assertEqual(p["max_force_kn"], 50.0)
+        self.assertEqual(p["rated_output_tph"], 300000.0)
+
+    def test_speed_poor_flow_halves_output(self):
+        s = g.speed_recommendation("Poor", 300000)
+        self.assertEqual(s["percent_of_rating"], 50)
+        self.assertEqual(s["tpm"], 2500)
+        self.assertEqual(s["tpm_low"], 2250)
+        self.assertEqual(s["tpm_high"], 2750)
+
+    def test_speed_excellent_flow_full_output(self):
+        s = g.speed_recommendation("Excellent", 300000)
+        self.assertEqual(s["tpm"], 5000)
+        self.assertEqual(s["percent_of_rating"], 100)
+
+    def test_lod_low_moisture_advice(self):
+        a = g.lod_advisory(0.96)
+        self.assertIn("Low moisture", a["level"])
+        self.assertTrue(any("capping" in d for d in a["defects"]))
+        self.assertTrue(any("humidify" in x for x in a["actions"]))
+
+    def test_lod_in_window(self):
+        a = g.lod_advisory(1.5)
+        self.assertIn("window", a["level"])
+        self.assertEqual(a["defects"], [])
+
+    def test_lod_high_moisture_advice(self):
+        a = g.lod_advisory(3.0)
+        self.assertIn("High moisture", a["level"])
+        self.assertTrue(any("sticking" in d for d in a["defects"]))
+        self.assertTrue(any("re dry" in x for x in a["actions"]))
+
+    def test_recommendations_bundle_poor(self):
+        r = g.recommendations("Poor", 0.96, 300000, 71.8)
+        self.assertEqual(r["speed"]["tpm"], 2500)
+        self.assertEqual(r["weight"], "4.5 to 6.0%")
+        self.assertIn("uneven die fill", r["die_fill"])
+
+    def test_recommendations_bundle_good(self):
+        r = g.recommendations("Good", 1.5, 300000, 71.8)
+        self.assertIn("uniform", r["die_fill"])
+
+    def test_models_list(self):
+        names = [m[0] for m in g.MODELS]
+        self.assertIn("Heckel equation", names)
+        self.assertIn("Ryshkewitch-Duckworth", names)
+        self.assertIn("Beverloo orifice flow", names)
+        self.assertEqual(len(g.MODELS), 7)
+
+
 if __name__ == "__main__":
     unittest.main()

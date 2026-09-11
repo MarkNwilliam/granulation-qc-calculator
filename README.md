@@ -4,7 +4,7 @@
 
 **Turns in process sieve and physical granulation data into the batch record figures every granulation section fills out, with USP and Ph. Eur. flow classification and a plain language ease of compression verdict.**
 
-[![Tests](https://img.shields.io/badge/tests-27%20passing-green)](#)
+[![Tests](https://img.shields.io/badge/tests-45%20passing-green)](#)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#)
 [![Deps](https://img.shields.io/badge/deps-none-brightgreen)](#)
 [![License](https://img.shields.io/badge/license-MIT-green)](#)
@@ -27,6 +27,10 @@ The rounding follows the plant convention exactly: each individual % w/w is show
 Section A wants the sample weight in grams and the retained weight on each of the six sieves. All seven fields must have a value before any number in the section computes, until then every output stays a dash. Each sieve row shows its % w/w with the whole number in brackets, and above 20#, above 60# cumulative and below 60# cumulative each get a live Pass or Fail badge against their limits of NMT 15%, NMT 35% and 50 to 90%. Derived rows give D, the unaccountable loss in red when retained beats the sample, and the fines below 60# cross check with its inline note when the two roundings diverge by more than one percentage point.
 
 Section B badges LOD against NMT 2.5, bulk density against 0.40 to 0.70 and tapped density against 0.65 to 0.95, then computes Carr's Index and Hausner Ratio the moment both densities are in, tagging each with its flow character band. When the two ratings differ, both show and the worse one drives.
+
+Section C carries the press profile. The DLT 50/300/300 is loaded with an editable maximum force, rated output and maximum tablet size, so confirm the numbers against the machine plate. With the batch complete the tool recommends a permissible turret output as a band of tablets per hour and a percent of the press rating, the flow character setting the factor, an expected weight variation band, and a die fill note. It scores sticking and picking risk and capping and lamination risk from the LOD, the fines, the oversize, the flow rating and the planned press settings, listing each contributing factor, and it prints the moisture window advisory with the corrective actions, re humidify when too dry, re dry and re lubricate when too wet.
+
+The recommendation engine leans on standard models: Carr and Hausner for flow and compressibility read with USP <1174>, the Beverloo orifice flow law for die fill, the dwell time relation t = (contact angle / 360) x (60 / rpm), and the Heckel, Ryshkewitch-Duckworth and Leuenberger compaction models that explain capping and lamination. The in process specification and USP <905> frame the weight variation. All of it is advisory and is confirmed on the first compression.
 
 The sticky verdict appears only when both sections are complete. It starts from the worse of the Carr's and Hausner ratings, steps down one level when fines sit below 50% or above 90%, steps down another when above 20# beats 15%, and clamps at the ends of the flow table. The Reset button clears everything back to a blank form.
 
@@ -55,7 +59,7 @@ Worked example batch QK260454: % w/w reads 1.3% (1%), 14.7% (15%), 8.2% (8%), 6.
 granulation-qc-calculator/
 ├── index.html             # interactive dashboard (open this)
 ├── granulation_qc.py      # sieve, flow and verdict library + helpers
-├── test_granulation_qc.py # 27 unit tests
+├── test_granulation_qc.py # 45 unit tests
 ├── docs/                  # README preview screenshot
 └── README.md
 ```
