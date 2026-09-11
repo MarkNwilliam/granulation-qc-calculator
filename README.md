@@ -4,7 +4,7 @@
 
 **Turns in process sieve and physical granulation data into the batch record figures every granulation section fills out, with USP and Ph. Eur. flow classification and a plain language ease of compression verdict.**
 
-[![Tests](https://img.shields.io/badge/tests-45%20passing-green)](#)
+[![Tests](https://img.shields.io/badge/tests-54%20passing-green)](#)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#)
 [![Deps](https://img.shields.io/badge/deps-none-brightgreen)](#)
 [![License](https://img.shields.io/badge/license-MIT-green)](#)
@@ -29,6 +29,8 @@ Section A wants the sample weight in grams and the retained weight on each of th
 Section B badges LOD against NMT 2.5, bulk density against 0.40 to 0.70 and tapped density against 0.65 to 0.95, then computes Carr's Index and Hausner Ratio the moment both densities are in, tagging each with its flow character band. When the two ratings differ, both show and the worse one drives.
 
 Section C carries the press profile. The DLT 50/300/300 is loaded with an editable maximum force, rated output and maximum tablet size, so confirm the numbers against the machine plate. With the batch complete the tool recommends a permissible turret output as a band of tablets per hour and a percent of the press rating, the flow character setting the factor, an expected weight variation band, and a die fill note. It scores sticking and picking risk and capping and lamination risk from the LOD, the fines, the oversize, the flow rating and the planned press settings, listing each contributing factor, and it prints the moisture window advisory with the corrective actions, re humidify when too dry, re dry and re lubricate when too wet.
+
+Section D is optional and takes only what you hold. Punch diameter gives the punch surface area A = pi x (d/2)^2. Contact angle and turret speed give the dwell time t = (contact angle / 360) x (60 / rpm). A Heckel study, that is k and A plus a target solid fraction, gives the compaction pressure P = (ln(1 / (1 - D)) - A) / k, and pressure with area gives the force F = P x A with 1 MPa equal to 1 N/mm2. Every result stays a dash until its own inputs are present, so the tool never invents a force from granulation data alone.
 
 The recommendation engine leans on standard models: Carr and Hausner for flow and compressibility read with USP <1174>, the Beverloo orifice flow law for die fill, the dwell time relation t = (contact angle / 360) x (60 / rpm), and the Heckel, Ryshkewitch-Duckworth and Leuenberger compaction models that explain capping and lamination. The in process specification and USP <905> frame the weight variation. All of it is advisory and is confirmed on the first compression.
 
@@ -59,7 +61,7 @@ Worked example batch QK260454: % w/w reads 1.3% (1%), 14.7% (15%), 8.2% (8%), 6.
 granulation-qc-calculator/
 ├── index.html             # interactive dashboard (open this)
 ├── granulation_qc.py      # sieve, flow and verdict library + helpers
-├── test_granulation_qc.py # 45 unit tests
+├── test_granulation_qc.py # 54 unit tests
 ├── docs/                  # README preview screenshot
 └── README.md
 ```

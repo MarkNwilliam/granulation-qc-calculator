@@ -4,6 +4,7 @@ Pure python, no dependencies. Mirror of the interactive dashboard at
 https://marknwilliam.github.io/granulation-qc-calculator/
 """
 from decimal import Decimal, ROUND_HALF_UP
+import math
 
 ORDER = ("above20", "above40", "above60", "above80", "above100", "below100")
 SIEVE_BANDS = (("Above 20#", "above20"), ("Above 40#", "above40"),
@@ -264,3 +265,56 @@ def recommendations(worse_rating, lod, rated_output_tph, fines_pct):
         die_fill = "die fill should stay uniform at the recommended speed"
     return {"speed": speed, "weight": WEIGHT_RSD[worse_rating],
             "lod": lodv, "die_fill": die_fill}
+
+
+def punch_area(diameter_mm):
+    """Punch face area from the punch diameter, in square mm and square cm."""
+    r = float(diameter_mm) / 2.0
+    mm2 = math.pi * r * r
+    return {"mm2": mm2, "cm2": mm2 / 100.0}
+
+
+def dwell_time(alpha_deg, rpm):
+    """Punch dwell time t = (contact angle / 360) x (60 / rpm)."""
+    if rpm <= 0:
+        raise ValueError("Turret speed must be greater than zero")
+    seconds = (float(alpha_deg) / 360.0) * (60.0 / float(rpm))
+    return {"seconds": seconds, "ms": seconds * 1000.0}
+
+
+def heckel_pressure(solid_fraction, k, a):
+    """Pressure to reach a relative density from the Heckel equation.
+
+    ln(1 / (1 - D)) = k P + A, so P = (ln(1 / (1 - D)) - A) / k with k = 1/Py.
+    """
+    if not (0.0 < solid_fraction < 1.0):
+        raise ValueError("Solid fraction must be between 0 and 1")
+    if k <= 0:
+        raise ValueError("Heckel k must be greater than zero")
+    return (math.log(1.0 / (1.0 - float(solid_fraction))) - float(a)) / float(k)
+
+
+def compression_force(pressure_mpa, area_mm2):
+    """Force in kN from pressure in MPa (1 MPa = 1 N/mm2) and area in mm2."""
+    return float(pressure_mpa) * float(area_mm2) / 1000.0
+
+
+def compression_setting(diameter_mm=None, solid_fraction=None, heckel_k=None,
+                        heckel_a=None, alpha_deg=None, rpm=None):
+    """Optional compression setting.
+
+    Every result stays None until its own inputs are present, so nothing is
+    invented from data the plant does not hold.
+    """
+    out = {"area_mm2": None, "area_cm2": None, "pressure_mpa": None,
+           "force_kn": None, "dwell_ms": None}
+    if diameter_mm:
+        a = punch_area(diameter_mm)
+        out["area_mm2"], out["area_cm2"] = a["mm2"], a["cm2"]
+    if solid_fraction is not None and heckel_k is not None and heckel_a is not None:
+        out["pressure_mpa"] = heckel_pressure(solid_fraction, heckel_k, heckel_a)
+    if out["pressure_mpa"] is not None and out["area_mm2"] is not None:
+        out["force_kn"] = compression_force(out["pressure_mpa"], out["area_mm2"])
+    if alpha_deg and rpm:
+        out["dwell_ms"] = dwell_time(alpha_deg, rpm)["ms"]
+    return out

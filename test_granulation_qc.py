@@ -254,5 +254,52 @@ class Recommendations(unittest.TestCase):
         self.assertEqual(len(g.MODELS), 7)
 
 
+class CompressionSetting(unittest.TestCase):
+    def test_punch_area_8mm(self):
+        a = g.punch_area(8)
+        self.assertAlmostEqual(a["mm2"], 50.2655, places=3)
+        self.assertAlmostEqual(a["cm2"], 0.50265, places=4)
+
+    def test_dwell_time(self):
+        d = g.dwell_time(22, 50)
+        self.assertAlmostEqual(d["ms"], 73.333, places=2)
+
+    def test_heckel_pressure(self):
+        p = g.heckel_pressure(0.85, 0.01, 0.5)
+        self.assertAlmostEqual(p, 139.72, places=1)
+
+    def test_compression_force_units(self):
+        f = g.compression_force(139.72, 50.2655)
+        self.assertAlmostEqual(f, 7.023, places=2)
+
+    def test_setting_full(self):
+        s = g.compression_setting(8, 0.85, 0.01, 0.5, 22, 50)
+        self.assertAlmostEqual(s["area_mm2"], 50.2655, places=3)
+        self.assertAlmostEqual(s["pressure_mpa"], 139.72, places=1)
+        self.assertAlmostEqual(s["force_kn"], 7.023, places=2)
+        self.assertAlmostEqual(s["dwell_ms"], 73.333, places=2)
+
+    def test_setting_without_heckel_leaves_pressure_and_force_blank(self):
+        s = g.compression_setting(8, alpha_deg=22, rpm=50)
+        self.assertAlmostEqual(s["area_mm2"], 50.2655, places=3)
+        self.assertIsNone(s["pressure_mpa"])
+        self.assertIsNone(s["force_kn"])
+        self.assertAlmostEqual(s["dwell_ms"], 73.333, places=2)
+
+    def test_setting_without_diameter_leaves_area_and_force_blank(self):
+        s = g.compression_setting(solid_fraction=0.85, heckel_k=0.01, heckel_a=0.5)
+        self.assertIsNone(s["area_mm2"])
+        self.assertIsNone(s["force_kn"])
+        self.assertAlmostEqual(s["pressure_mpa"], 139.72, places=1)
+
+    def test_setting_all_blank(self):
+        s = g.compression_setting()
+        self.assertTrue(all(v is None for v in s.values()))
+
+    def test_heckel_a_zero_is_accepted(self):
+        s = g.compression_setting(8, 0.85, 0.01, 0, None, None)
+        self.assertIsNotNone(s["pressure_mpa"])
+
+
 if __name__ == "__main__":
     unittest.main()

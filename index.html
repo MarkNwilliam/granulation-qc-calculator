@@ -183,6 +183,32 @@
     </details>
   </div>
 
+  <div class="panel">
+    <h2>Section D &middot; Compression setting, optional inputs</h2>
+    <div class="ph">Fill only what you hold. Any result whose own inputs are blank stays a dash, so nothing is invented. Punch surface area needs the punch diameter, compaction pressure needs a Heckel study, compression force needs both, and dwell time needs the contact angle and turret speed.</div>
+    <table>
+      <thead><tr><th>Input</th><th>Value</th><th>Unit</th></tr></thead>
+      <tbody>
+        <tr><td>Punch diameter</td><td><input id="pdia" class="small" type="number" min="0.1" step="0.01"></td><td>mm</td></tr>
+        <tr><td>Target solid fraction</td><td><input id="csf" class="small" type="number" min="0.01" max="0.99" step="0.01"></td><td>0 to 1</td></tr>
+        <tr><td>Heckel k</td><td><input id="ck" class="small" type="number" min="0.0001" step="0.001"></td><td>1/MPa</td></tr>
+        <tr><td>Heckel A</td><td><input id="ca" class="small" type="number" step="0.01"></td><td></td></tr>
+        <tr><td>Contact angle</td><td><input id="calpha" class="small" type="number" min="0.1" step="0.1"></td><td>deg</td></tr>
+        <tr><td>Turret speed</td><td><input id="crpm" class="small" type="number" min="1" step="0.1"></td><td>rpm</td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:16px">
+      <thead><tr><th>Result</th><th class="right">Value</th></tr></thead>
+      <tbody>
+        <tr><td>Punch surface area</td><td class="right"><span class="outnum" id="cArea">-</span> <span class="precise" id="cAreaCm"></span></td></tr>
+        <tr><td>Required compaction pressure</td><td class="right"><span class="outnum" id="cP">-</span> <span class="precise" id="cPu"></span></td></tr>
+        <tr><td>Required compression force</td><td class="right"><span class="outnum" id="cF">-</span> <span class="precise" id="cFu"></span></td></tr>
+        <tr><td>Punch dwell time</td><td class="right"><span class="outnum" id="cDwell">-</span> <span class="precise" id="cDu"></span></td></tr>
+      </tbody>
+    </table>
+    <div class="note">Punch surface area is A = pi x (d/2)^2. Dwell time is t = (contact angle / 360) x (60 / rpm). Heckel pressure is P = (ln(1 / (1 - D)) - A) / k and force is F = P x A, with 1 MPa equal to 1 N/mm2. The Heckel k and A come from a compaction study on the blend, so leave them blank until you have that.</div>
+  </div>
+
   <div class="btnrow"><button class="btn" id="reset">Reset all fields</button></div>
 </div>
 <footer>granulation-qc-calculator &middot; all results stay in the browser</footer>
@@ -380,21 +406,41 @@ function computeC(){
   $("lodDef").textContent=la.defects.length?("watch for: "+la.defects.join(", ")):"";
   $("lodAct").textContent="do: "+la.actions.join("; ");
 }
+function computeD(){
+  const d=nf($("pdia").value), sf=nf($("csf").value), k=nf($("ck").value), a=nf($("ca").value);
+  const al=nf($("calpha").value), rpm=nf($("crpm").value);
+  let area=null, cm2=null, P=null, F=null, dwell=null;
+  if(d&&d>0){ area=Math.PI*Math.pow(d/2,2); cm2=area/100; }
+  if(sf!=null&&k!=null&&a!=null&&sf>0&&sf<1&&k>0){ P=(Math.log(1/(1-sf))-a)/k; }
+  if(P!=null&&area!=null){ F=P*area/1000; }
+  if(al&&rpm&&rpm>0){ dwell=(al/360)*(60/rpm)*1000; }
+  $("cArea").textContent=area!=null?fmt(area,2):"-";
+  $("cAreaCm").textContent=cm2!=null?"("+fmt(cm2,3)+" cm2)":"";
+  $("cP").textContent=P!=null?fmt(P,2):"-";
+  $("cPu").textContent=P!=null?"MPa":"";
+  $("cF").textContent=F!=null?fmt(F,2):"-";
+  $("cFu").textContent=F!=null?"kN":"";
+  $("cDwell").textContent=dwell!=null?fmt(dwell,1):"-";
+  $("cDu").textContent=dwell!=null?"ms":"";
+}
 $("modelRows").innerHTML=MODELS.map(m=>"<tr><td><b>"+m[0]+"</b></td><td>"+m[1]+"</td><td>"+m[2]+"</td></tr>").join("");
 [$("A"),...S.map(id=>$(id)),$("lod"),$("bd"),$("td"),
- $("pf"),$("pr"),$("pd"),$("bf"),$("bo")]
-  .forEach(el=>el.addEventListener("input",()=>{computeA();computeB();computeC();}));
+ $("pf"),$("pr"),$("pd"),$("bf"),$("bo"),
+ $("pdia"),$("csf"),$("ck"),$("ca"),$("calpha"),$("crpm")]
+  .forEach(el=>el.addEventListener("input",()=>{computeA();computeB();computeC();computeD();}));
 $("reset").addEventListener("click",()=>{
   $("A").value="100.00";S.forEach(id=>$(id).value="");
   $("lod").value="";$("bd").value="";$("td").value="";
   $("pf").value="50";$("pr").value="300000";$("pd").value="30";
   $("bf").value="20";$("bo").value="240000";
-  computeA();computeB();computeC();});
+  $("pdia").value="";$("csf").value="";$("ck").value="";$("ca").value="";
+  $("calpha").value="";$("crpm").value="";
+  computeA();computeB();computeC();computeD();});
 if(location.search.includes("demo")){
   $("A").value="100.00";
   [["s20",1.34],["s40",14.66],["s60",8.17],["s80",6.29],["s100",2.48],["sB",62.98]]
     .forEach(([id,v])=>$(id).value=String(v));
   $("lod").value="0.96";$("bd").value="0.52";$("td").value="0.74";
 }
-computeA();computeB();computeC();
+computeA();computeB();computeC();computeD();
 </script>
