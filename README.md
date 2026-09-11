@@ -1,0 +1,65 @@
+<div align="center">
+
+# Granulation QC Calculator
+
+**Turns in process sieve and physical granulation data into the batch record figures every granulation section fills out, with USP and Ph. Eur. flow classification and a plain language ease of compression verdict.**
+
+[![Tests](https://img.shields.io/badge/tests-27%20passing-green)](#)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#)
+[![Deps](https://img.shields.io/badge/deps-none-brightgreen)](#)
+[![License](https://img.shields.io/badge/license-MIT-green)](#)
+[![Live demo](https://img.shields.io/badge/live%20demo-online-0e7490)](https://marknwilliam.github.io/granulation-qc-calculator/)
+
+</div>
+
+---
+
+![Dashboard preview](docs/preview.png)
+
+## About
+
+In process granulation control lives on a fixed set of figures: the sieve analysis, the loss on drying, the bulk and tapped densities, and the flow character they imply. This tool types those raw weights and values in and gets every downstream number back live, the % w/w per sieve, the cumulative Above 60# and Below 60# figures that the batch record uses, total retained, unaccountable loss, fines below 60# by the alternate BMR calculation, Carr's Index and Hausner Ratio, all of them against their acceptance badges. Once the whole form is complete the page prints one verdict on how easy or hard that granulation will be to compress, judged using the USP and Ph. Eur. flow character table.
+
+The rounding follows the plant convention exactly: each individual % w/w is shown to one decimal with the rounded whole number the batch record uses beside it, like 14.7% (15%), and the cumulative figures sum those rounded whole numbers so the printout reproduces the hand calculation. Standard round half up is used everywhere, so a floating point artifact like 71.74999999 never appears. Nothing is sent anywhere, everything runs in the browser, and the same math ships as a tiny pure python library for scripts and tests.
+
+## Using the calculator
+
+Section A wants the sample weight in grams and the retained weight on each of the six sieves. All seven fields must have a value before any number in the section computes, until then every output stays a dash. Each sieve row shows its % w/w with the whole number in brackets, and above 20#, above 60# cumulative and below 60# cumulative each get a live Pass or Fail badge against their limits of NMT 15%, NMT 35% and 50 to 90%. Derived rows give D, the unaccountable loss in red when retained beats the sample, and the fines below 60# cross check with its inline note when the two roundings diverge by more than one percentage point.
+
+Section B badges LOD against NMT 2.5, bulk density against 0.40 to 0.70 and tapped density against 0.65 to 0.95, then computes Carr's Index and Hausner Ratio the moment both densities are in, tagging each with its flow character band. When the two ratings differ, both show and the worse one drives.
+
+The sticky verdict appears only when both sections are complete. It starts from the worse of the Carr's and Hausner ratings, steps down one level when fines sit below 50% or above 90%, steps down another when above 20# beats 15%, and clamps at the ends of the flow table. The Reset button clears everything back to a blank form.
+
+## Quick start
+
+```bash
+cat > gran.json <<'EOF'
+{
+  "sample_g": 100.00,
+  "retained": {"above20": 1.34, "above40": 14.66, "above60": 8.17,
+               "above80": 6.29, "above100": 2.48, "below100": 62.98},
+  "lod": 0.96, "bulk_density": 0.52, "tapped_density": 0.74
+}
+EOF
+```
+
+```bash
+python3 -m unittest test_granulation_qc.py
+```
+
+Worked example batch QK260454: % w/w reads 1.3% (1%), 14.7% (15%), 8.2% (8%), 6.3% (6%), 2.5% (2%), 63.0% (63%). Above 60# cumulative is 24% and passes NMT 35%, below 60# cumulative is 71% and passes 50 to 90%. D is 95.92 g, loss 4.08 g, fines below 60# come to 71.75 g or 71.8%. Carr's Index is 29.73% and Hausner Ratio is 1.42, both landing in the Poor band on the USP and Ph. Eur. table. No further downgrades trigger, so the compression outlook is Poor with the guidance to watch for capping, lamination and weight variation.
+
+## Repository layout
+
+```
+granulation-qc-calculator/
+├── index.html             # interactive dashboard (open this)
+├── granulation_qc.py      # sieve, flow and verdict library + helpers
+├── test_granulation_qc.py # 27 unit tests
+├── docs/                  # README preview screenshot
+└── README.md
+```
+
+## License
+
+MIT.

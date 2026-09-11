@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Granulation QC Calculator</title>
+<style>
+  :root{--ink:#0f172a;--muted:#64748b;--brand:#4338ca;--brand2:#3730a3;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--line:#e2e8f0;--card:#fff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:#f1f5f9;line-height:1.5}
+  header{background:linear-gradient(135deg,#4338ca,#3730a3);color:#fff;padding:26px 30px}
+  header h1{font-size:22px;font-weight:800}
+  header p{font-size:13px;opacity:.92;margin-top:4px;max-width:900px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 24px}
+  .verdict{position:sticky;top:0;z-index:5;display:none;border-radius:0 0 12px 12px;padding:14px 18px;
+    margin:0 -24px 18px;box-shadow:0 6px 14px rgba(15,23,42,.12);border:1px solid var(--line);border-top:none}
+  .verdict.show{display:block}
+  .verdict .tg{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.85}
+  .verdict .tl{font-size:19px;font-weight:800;margin-top:2px}
+  .verdict .tx{font-size:13px;margin-top:3px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+  .panel h2{font-size:15px;font-weight:800;margin-bottom:4px}
+  .panel .ph{font-size:12px;color:var(--muted);margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+  td.right,th.right{text-align:right}
+  input{width:130px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
+  input.small{width:110px}
+  .outnum{font-weight:800;font-size:13.5px}
+  .outdim{color:var(--muted);font-size:11px}
+  .precise{font-size:10.5px;color:var(--muted);font-weight:400}
+  .chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700}
+  .c-pass{background:#dcfce7;color:#15803d}.c-fail{background:#fee2e2;color:#b91c1c}
+  .c-g{background:#dcfce7;color:#15803d}.c-a{background:#fef3c7;color:#b45309}.c-r{background:#fee2e2;color:#b91c1c}
+  .warn{color:#b91c1c;font-weight:700}
+  .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.6}
+  .minote{font-size:11px;background:#fef9c3;border-radius:7px;padding:6px 9px;color:#854d0e;display:inline-block;margin-top:6px}
+  details{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:14px}
+  summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--brand)}
+  .btnrow{display:flex;gap:10px;margin-top:16px}
+  .btn{border:none;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;background:var(--brand);color:#fff}
+  .btn:hover{background:var(--brand2)}
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:22px}
+  @media(max-width:700px){input{width:100%;min-width:90px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Granulation QC Calculator</h1>
+  <p>In process particle size from the sieve bank and physical parameters from LOD and the two densities. Every downstream value is live as you type and every number sits beside its acceptance badge. The ease of compression verdict below is judged on the USP and Ph. Eur. flow character table. Nothing leaves your browser.</p>
+</header>
+<div class="wrap">
+  <div class="verdict" id="verdict">
+    <div class="tg">Ease of compression &middot; USP &lt;1174&gt; flow classification</div>
+    <div class="tl" id="vTitle"></div>
+    <div class="tx" id="vText"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Section A &middot; Particle size distribution</h2>
+    <div class="ph">Weigh and sieve the granulation sample, then type each retained fraction. All seven fields need a value before anything computes.</div>
+    <table>
+      <thead><tr><th>Quantity of sample taken (A), g</th><th>Retained weight, g</th><th class="right">% w/w</th><th class="right">Acceptance</th></tr></thead>
+      <tbody>
+        <tr><td>Sample</td><td><input id="A" type="number" min="0.01" step="0.01" value="100.00"></td>
+          <td class="right outnum" id="pA">-</td><td></td></tr>
+        <tr><td>Above 20#</td><td><input id="s20" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="p20">-</span></td>
+          <td class="right"><span id="b20"></span><div class="precise">NMT 15</div></td></tr>
+        <tr><td>Above 40#</td><td><input id="s40" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="p40">-</span></td><td></td></tr>
+        <tr><td>Above 60#</td><td><input id="s60" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="p60">-</span></td><td></td></tr>
+        <tr><td>Above 80#</td><td><input id="s80" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="p80">-</span></td><td></td></tr>
+        <tr><td>Above 100#</td><td><input id="s100" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="p100">-</span></td><td></td></tr>
+        <tr><td>Below 100#</td><td><input id="sB" class="s" type="number" min="0" step="0.01"></td>
+          <td class="right"><span class="outnum" id="pB">-</span></td><td></td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:16px">
+      <thead><tr><th>Derived value</th><th class="right">Result</th><th class="right">Acceptance</th></tr></thead>
+      <tbody>
+        <tr><td>Cumulative Above 60#<div class="precise">% w/w above 20# + 40# + 60#, rounded</div></td>
+          <td class="right"><span class="outnum" id="ab60">-</span> <span class="precise" id="ab60p"></span></td>
+          <td class="right"><span id="bAb60"></span><div class="precise">NMT 35</div></td></tr>
+        <tr><td>Cumulative Below 60#<div class="precise">% w/w above 80# + 100# + below 100#, rounded</div></td>
+          <td class="right"><span class="outnum" id="be60">-</span> <span class="precise" id="be60p"></span></td>
+          <td class="right"><span id="bBe60"></span><div class="precise">50 to 90</div></td></tr>
+        <tr><td>Total quantity retained (D)</td><td class="right"><span class="outnum" id="D">-</span> g</td><td></td></tr>
+        <tr><td>Unaccountable loss</td><td class="right"><span class="outnum" id="loss">-</span> g</td><td id="lossNote"></td></tr>
+        <tr><td>Fines below 60# (C)</td><td class="right"><span class="outnum" id="C">-</span> g</td><td></td></tr>
+        <tr><td>% of fines below 60#</td><td class="right"><span class="outnum" id="fP">-</span> % <div class="precise" id="fCross"></div></td><td id="fCell"></td></tr>
+      </tbody>
+    </table>
+    <div class="note">Individual % w/w shows to one decimal with the rounded whole number used by the batch record beside it, like 14.7% (15%). The cumulative Above 60# and Below 60# figures sum those rounded whole numbers so they reproduce the hand calculation from the printed report. A negative loss means retained weight beat the sample and is a data entry error.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Section B &middot; Physical parameters</h2>
+    <div class="ph">Loss on drying, bulk and tapped densities. Flow classification follows the USP and European Pharmacopoeia bands.</div>
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th><th class="right">Acceptance</th></tr></thead>
+      <tbody>
+        <tr><td>Loss on drying, %</td><td><input id="lod" class="small" type="number" min="0" step="0.01" placeholder="NMT 2.5"></td>
+          <td class="right"><span id="bLod"></span><div class="precise">NMT 2.5</div></td></tr>
+        <tr><td>Bulk density, g/ml</td><td><input id="bd" class="small" type="number" min="0" step="0.01" placeholder="0.40 to 0.70"></td>
+          <td class="right"><span id="bBd"></span><div class="precise">0.40 to 0.70</div></td></tr>
+        <tr><td>Tapped density, g/ml</td><td><input id="td" class="small" type="number" min="0" step="0.01" placeholder="0.65 to 0.95"></td>
+          <td class="right"><span id="bTd"></span><div class="precise">0.65 to 0.95</div></td></tr>
+      </tbody>
+    </table>
+    <table style="margin-top:16px">
+      <thead><tr><th>Derived value</th><th class="right">Result</th><th class="right">Flow character</th></tr></thead>
+      <tbody>
+        <tr><td>Carr's Index, %</td><td class="right"><span class="outnum" id="carr">-</span></td>
+          <td class="right"><span id="carrChip"></span></td></tr>
+        <tr><td>Hausner Ratio</td><td class="right"><span class="outnum" id="haus">-</span></td>
+          <td class="right"><span id="hausChip"></span></td></tr>
+      </tbody>
+    </table>
+    <div class="note" id="worseNote"></div>
+    <details>
+      <summary>USP and Ph. Eur. flow character reference</summary>
+      <table>
+        <thead><tr><th>Carr's Index %</th><th>Hausner Ratio</th><th>Flow character</th></tr></thead>
+        <tbody>
+          <tr><td>&le;10</td><td>1.00 to 1.11</td><td>Excellent</td></tr>
+          <tr><td>11 to 15</td><td>1.12 to 1.18</td><td>Good</td></tr>
+          <tr><td>16 to 20</td><td>1.19 to 1.25</td><td>Fair</td></tr>
+          <tr><td>21 to 25</td><td>1.26 to 1.34</td><td>Passable</td></tr>
+          <tr><td>26 to 31</td><td>1.35 to 1.45</td><td>Poor</td></tr>
+          <tr><td>32 to 37</td><td>1.46 to 1.59</td><td>Very poor</td></tr>
+          <tr><td>&gt;38</td><td>&gt;1.60</td><td>Very, very poor</td></tr>
+        </tbody>
+      </table>
+    </details>
+  </div>
+
+  <div class="btnrow"><button class="btn" id="reset">Reset all fields</button></div>
+</div>
+<footer>granulation-qc-calculator &middot; all results stay in the browser</footer>
+<script>
+const RATINGS=["Excellent","Good","Fair","Passable","Poor","Very poor","Very, very poor"];
+const OUTLOOK={
+  "Excellent":"expect smooth, consistent compression with minimal tooling adjustment.",
+  "Good":"expect even die filling and little weight fluctuation during compression.",
+  "Fair":"flow is acceptable but expect moderate tooling adjustment; monitor tablet weight variation closely during compression.",
+  "Passable":"bulk flow is sluggish; plan to use a force feeder and watch weight variation and sticking during compression.",
+  "Poor":"higher risk of capping, lamination and weight variation; consider a glidant or re granulation before compression.",
+  "Very poor":"feeding problems and weight variation are likely; re granulation or a binder change should come first.",
+  "Very, very poor":"high risk of capping, lamination, or weight variation; consider re granulation or reformulation before proceeding."
+};
+const CARR_MAX=[10,15,20,25,31,37], HAUS_MAX=[1.11,1.18,1.25,1.34,1.45,1.59];
+function rhu(x,n){const f=Math.pow(10,n);return (x<0?-1:1)*Math.floor(Math.abs(x)*f+0.5)/f;}
+function fmt(x,n){return rhu(x,n).toFixed(n);}
+function nf(v){return v===""?null:parseFloat(v);}
+function ratingCarr(c){for(let i=0;i<CARR_MAX.length;i++){if(c<=CARR_MAX[i])return RATINGS[i];}return RATINGS[6];}
+function ratingHaus(h){for(let i=0;i<HAUS_MAX.length;i++){if(h<=HAUS_MAX[i])return RATINGS[i];}return RATINGS[6];}
+function verdictOf(rCarr,rH,fines,above20){
+  let lv=Math.max(RATINGS.indexOf(rCarr),RATINGS.indexOf(rH));
+  if(fines>90||fines<50)lv++;
+  if(above20>15)lv++;
+  lv=Math.max(0,Math.min(6,lv));
+  const name=RATINGS[lv];
+  return {level:lv,name:name,text:OUTLOOK[name]};
+}
+function badge(pass){return '<span class="chip c-'+(pass?"pass":"fail")+'">'+(pass?"Pass":"Fail")+'</span>';}
+function rChip(name){const c=({Excellent:1,Good:1,Fair:2,Passable:2})[name]?({Excellent:"g",Good:"g",Fair:"a",Passable:"a"})[name]:"r";
+  return '<span class="chip c-'+c+'">'+name+'</span>';}
+const $=id=>document.getElementById(id);
+const S=["s20","s40","s60","s80","s100","sB"];
+const P=["p20","p40","p60","p80","p100","pB"];
+function sectionAComplete(){
+  if(nf($("A").value)==null)return false;
+  return S.every(id=>nf($(id).value)!=null);
+}
+function sectionBComplete(){
+  return nf($("lod").value)!=null&&nf($("bd").value)!=null&&nf($("td").value)!=null;
+}
+function computeA(){
+  const A=nf($("A").value);
+  const w=S.map(id=>nf($(id).value));
+  if(A==null||w.some(x=>x==null)){
+    P.forEach(id=>$(id).textContent="-");
+    ["ab60","be60","D","loss","C","fP"].forEach(id=>$(id).textContent="-");
+    ["ab60p","be60p","b20","bAb60","bBe60","lossNote","fCross","fCell"].forEach(id=>$(id).innerHTML="");
+    $("loss").className="outnum";
+    updateVerdict();return;
+  }
+  const pc=w.map(x=>x/A*100);
+  const indiv=pc.map((p,i)=>({p1:rhu(p,1),whole:rhu(p,0)}));
+  P.forEach((id,i)=>$(id).textContent=fmt(indiv[i].p1,1)+"% ("+indiv[i].whole+"%)");
+  const above60=indiv[0].whole+indiv[1].whole+indiv[2].whole;
+  const below60=indiv[3].whole+indiv[4].whole+indiv[5].whole;
+  const ab60p=rhu((w[0]+w[1]+w[2])/A*100,1);
+  const be60p=rhu((w[3]+w[4]+w[5])/A*100,1);
+  const D=rhu(w.reduce((a,b)=>a+b,0),2);
+  const loss=rhu(A-D,2);
+  const C=rhu(w[3]+w[4]+w[5],2);
+  const fP=rhu(C/A*100,1);
+  $("pA").textContent=fmt(A,2)+" g";
+  $("ab60").textContent=above60+"%";
+  $("ab60p").textContent="unrounded "+fmt(ab60p,1)+"%";
+  $("be60").textContent=below60+"%";
+  $("be60p").textContent="unrounded "+fmt(be60p,1)+"%";
+  $("b20").innerHTML=badge(indiv[0].whole<=15);
+  $("bAb60").innerHTML=badge(above60<=35);
+  $("bBe60").innerHTML=badge(below60>=50&&below60<=90);
+  $("D").textContent=fmt(D,2);
+  $("loss").textContent=fmt(loss,2);
+  $("loss").className=loss<0?"outnum warn":"outnum";
+  $("lossNote").innerHTML=loss<0?'<div class="precise warn">retained weight exceeded sample</div>':"";
+  $("C").textContent=fmt(C,2);
+  $("fP").textContent=fmt(fP,1);
+  const diff=Math.abs(below60-fP);
+  $("fCross").innerHTML=diff>1?'<span class="minote">check individual % roundings</span>':"";
+  $("fCell").innerHTML=C>A?'<div class="precise warn">C exceeds sample</div>':"";
+  updateVerdict();
+}
+function computeB(){
+  const lod=nf($("lod").value),bd=nf($("bd").value),td=nf($("td").value);
+  if(lod==null){$("bLod").innerHTML="";}else{$("bLod").innerHTML=badge(lod<=2.5);}
+  if(bd==null){$("bBd").innerHTML="";}else{$("bBd").innerHTML=badge(bd>=0.40&&bd<=0.70);}
+  if(td==null){$("bTd").innerHTML="";}else{$("bTd").innerHTML=badge(td>=0.65&&td<=0.95);}
+  if(bd!=null&&td!=null&&bd>0&&td>0){
+    const carr=rhu((td-bd)/td*100,2), haus=rhu(td/bd,2);
+    $("carr").textContent=fmt(carr,2)+"%";
+    $("haus").textContent=fmt(haus,2);
+    const rc=ratingCarr(carr),rh=ratingHaus(haus);
+    $("carrChip").innerHTML=rChip(rc);
+    $("hausChip").innerHTML=rChip(rh);
+    $("worseNote").innerHTML=rc===rh?("Both ratings land on "+rc+"."):
+      ("Both ratings shown; the worse one, "+ (RATINGS.indexOf(rc)>=RATINGS.indexOf(rh)?rc:rh) +", drives the verdict.");
+  }else{
+    $("carr").textContent="-";$("haus").textContent="-";
+    $("carrChip").innerHTML="";$("hausChip").innerHTML="";$("worseNote").innerHTML="";
+  }
+  updateVerdict();
+}
+function updateVerdict(){
+  const v=$("verdict");
+  if(sectionAComplete()&&sectionBComplete()){
+    const A=nf($("A").value);
+    const w=S.map(id=>nf($(id).value));
+    const indiv=w.map(x=>x/A*100).map(p=>({p1:rhu(p,1),whole:rhu(p,0)}));
+    const above20=indiv[0].whole, below60=indiv[3].whole+indiv[4].whole+indiv[5].whole;
+    const fines=rhu((w[3]+w[4]+w[5])/A*100,1);
+    const bd=nf($("bd").value),td=nf($("td").value);
+    const rc=ratingCarr(rhu((td-bd)/td*100,2)),rh=ratingHaus(rhu(td/bd,2));
+    const res=verdictOf(rc,rh,fines,above20);
+    v.className="verdict show"+(res.level<=2?" vt-g":res.level<=4?" vt-a":" vt-r");
+    v.style.background=res.level<=2?"#dcfce7":res.level<=4?"#fef3c7":"#fee2e2";
+    v.style.color=res.level<=2?"#15803d":res.level<=4?"#b45309":"#b91c1c";
+    $("vTitle").textContent="Compression outlook: "+res.name;
+    $("vText").textContent=res.text;
+  }else{
+    v.className="verdict";v.style="";$("vTitle").textContent="";$("vText").textContent="";
+  }
+}
+[$("A"),...S.map(id=>$(id)),$("lod"),$("bd"),$("td")]
+  .forEach(el=>el.addEventListener("input",()=>{computeA();computeB();}));
+$("reset").addEventListener("click",()=>{
+  $("A").value="100.00";S.forEach(id=>$(id).value="");
+  $("lod").value="";$("bd").value="";$("td").value="";
+  computeA();computeB();});
+if(location.search.includes("demo")){
+  $("A").value="100.00";
+  [["s20",1.34],["s40",14.66],["s60",8.17],["s80",6.29],["s100",2.48],["sB",62.98]]
+    .forEach(([id,v])=>$(id).value=String(v));
+  $("lod").value="0.96";$("bd").value="0.52";$("td").value="0.74";
+}
+computeA();computeB();
+</script>
